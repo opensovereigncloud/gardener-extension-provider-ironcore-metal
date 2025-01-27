@@ -130,12 +130,12 @@ func (w *workerDelegate) generateMachineClassAndSecrets(ctx context.Context) ([]
 			}
 		}
 
-		if workerConfig.MetaData != nil {
-			machineClassProviderSpec[metal.MetaDataFieldName] = workerConfig.MetaData
+		if workerConfig.Metadata != nil {
+			machineClassProviderSpec[metal.MetaDataFieldName] = workerConfig.Metadata
 		}
 
-		if workerConfig.AddressesFromNetworks != nil {
-			machineClassProviderSpec[metal.AddressesFromNetworksFieldName] = workerConfig.AddressesFromNetworks
+		if workerConfig.IPAMConfig != nil {
+			machineClassProviderSpec[metal.IPAMConfigFieldName] = workerConfig.IPAMConfig
 		}
 
 		for zoneIndex, zone := range pool.Zones {

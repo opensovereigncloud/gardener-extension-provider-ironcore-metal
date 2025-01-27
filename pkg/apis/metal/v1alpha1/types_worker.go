@@ -19,12 +19,12 @@ type WorkerConfig struct {
 	// ExtraServerLabels is a map of additional labels that are applied to the ServerClaim for Server selection.
 	// +optional
 	ExtraServerLabels map[string]string `json:"extraServerLabels,omitempty"`
-	// AddressesFromNetworks is a list of references to Network resources that should be used to assign IP addresses to the worker nodes.
+	// IPAMConfig is a list of references to Network resources that should be used to assign IP addresses to the worker nodes.
 	// +optional
-	AddressesFromNetworks []*AddressesFromNetworks `json:"addressesFromNetworks,omitempty"`
-	// MedaData is a key-value map of additional data which should be passed to the Machine.
+	IPAMConfig []IPAMConfig `json:"ipamConfig,omitempty"`
+	// Metadata is a key-value map of additional data which should be passed to the Machine.
 	// +optional
-	MetaData map[string]string `json:"metaData,omitempty"`
+	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -71,20 +71,20 @@ type IgnitionConfig struct {
 	Override bool `json:"override,omitempty"`
 }
 
-// SubnetRef is a reference to the IP subnet.
-type SubnetRef struct {
-	// Name is the name of the network.
+// IPAMObjectReference is a reference to the IPAM object, which will be used for IP allocation.
+type IPAMObjectReference struct {
+	// Name is the name of resource being referenced.
 	Name string `json:"name"`
-	// APIGroup is the group of the IP pool
+	// APIGroup is the group for the resource being referenced.
 	APIGroup string `json:"apiGroup"`
-	// Kind is the kind of the IP pool
+	// Kind is the type of resource being referenced.
 	Kind string `json:"kind"`
 }
 
-// AddressesFromNetworks is a reference to a network resource.
-type AddressesFromNetworks struct {
-	// Key is the name of metadata key for the network.
-	Key string `json:"key"`
-	// SubnetRef is a reference to the IP subnet.
-	SubnetRef *SubnetRef `json:"subnetRef"`
+// IPAMConfig is a reference to an IPAM resource.
+type IPAMConfig struct {
+	// MetadataKey is the name of metadata key for the network.
+	MetadataKey string `json:"metadataKey"`
+	// IPAMRef is a reference to the IPAM object, which will be used for IP allocation.
+	IPAMRef *IPAMObjectReference `json:"ipamRef"`
 }

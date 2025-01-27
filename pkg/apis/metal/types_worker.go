@@ -18,10 +18,10 @@ type WorkerConfig struct {
 	ExtraIgnition *IgnitionConfig
 	// ExtraServerLabels is a map of extra labels that are applied to the ServerClaim for Server selection.
 	ExtraServerLabels map[string]string
-	// AddressesFromNetworks is a list of references to Network resources that should be used to assign IP addresses to the worker nodes.
-	AddressesFromNetworks []*AddressesFromNetworks
-	// MetaData is a key-value map of additional data which should be passed to the Machine.
-	MetaData map[string]string
+	// IPAMConfig is a list of references to Network resources that should be used to assign IP addresses to the worker nodes.
+	IPAMConfig []IPAMConfig
+	// Metadata is a key-value map of additional data which should be passed to the Machine.
+	Metadata map[string]string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -57,20 +57,20 @@ type IgnitionConfig struct {
 	Override  bool
 }
 
-// SubnetRef is a reference to the IP subnet.
-type SubnetRef struct {
-	// Name is the name of the network.
+// IPAMObjectReference is a reference to the IPAM object, which will be used for IP allocation.
+type IPAMObjectReference struct {
+	// Name is the name of resource being referenced.
 	Name string
-	// APIGroup is the group of the IP pool
+	// APIGroup is the group for the resource being referenced.
 	APIGroup string
-	// Kind is the kind of the IP pool
+	// Kind is the type of resource being referenced.
 	Kind string
 }
 
-// AddressesFromNetworks is a reference to a network resource.
-type AddressesFromNetworks struct {
-	// Key is the name of metadata key for the network.
-	Key string
-	// SubnetRef is a reference to the IP subnet.
-	SubnetRef *SubnetRef
+// IPAMConfig is a reference to an IPAM resource.
+type IPAMConfig struct {
+	// MetadataKey is the name of metadata key for the network.
+	MetadataKey string
+	// IPAMRef is a reference to the IPAM object, which will be used for IP allocation.
+	IPAMRef *IPAMObjectReference
 }

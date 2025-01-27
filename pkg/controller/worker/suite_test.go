@@ -185,7 +185,7 @@ func SetupTest() (*corev1.Namespace, *gardener.ChartApplier) {
 				},
 				Override: true,
 			},
-			MetaData: map[string]string{
+			Metadata: map[string]string{
 				"foo": "bar",
 				"baz": "100",
 			},
