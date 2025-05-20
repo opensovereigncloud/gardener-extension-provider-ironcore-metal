@@ -8,7 +8,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.3.1
 	github.com/ahmetb/gen-crd-api-reference-docs v0.3.0
 	github.com/coreos/go-systemd/v22 v22.5.0
-	github.com/gardener/etcd-druid v0.27.0
+	github.com/gardener/etcd-druid/api v0.29.0
 	github.com/gardener/gardener v1.117.0
 	github.com/gardener/machine-controller-manager v0.57.2
 	github.com/go-logr/logr v1.4.2
@@ -54,7 +54,6 @@ require (
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/gardener/cert-management v0.17.5 // indirect
-	github.com/gardener/etcd-druid/api v0.29.0 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/errors v0.22.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
