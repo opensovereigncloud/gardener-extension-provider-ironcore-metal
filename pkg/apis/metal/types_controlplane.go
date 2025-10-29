@@ -66,8 +66,8 @@ type LoadBalancerConfig struct {
 	// MetallbConfig contains configuration settings for metallb.
 	MetallbConfig *MetallbConfig
 
-	// CalicoBgpConfig contains configuration settings for calico.
-	CalicoBgpConfig *CalicoBgpConfig
+	// CalicoConfig contains configuration settings for calico.
+	CalicoConfig *CalicoConfig
 
 	// MetalLoadBalancerConfig contains configuration settings for the metal load balancer.
 	MetalLoadBalancerConfig *MetalLoadBalancerConfig
@@ -96,6 +96,55 @@ type MetallbConfig struct {
 	// EnableL2Advertisement enables L2 advertisement.
 	EnableL2Advertisement bool
 }
+
+// CalicoConfig contains configuration settings for Calico.
+type CalicoConfig struct {
+	// CalicoBgpConfig contains BGP configuration settings for calico.
+	CalicoBgpConfig *CalicoBgpConfig
+
+	// CalicoIPPools are the CIDR blocks for LoadBalancer IPs.
+	CalicoIPPools []CalicoIPPool
+}
+
+// CalicoIPPool contains configuration for a Calico IP pool.
+type CalicoIPPool struct {
+	// CalicoIPPoolAllowedUses controls what the IP pool will be used for.
+	CalicoIPPoolAllowedUses []CalicoIPPoolAllowedUse
+
+	// CalicoIPPoolAssignmentMode determines the mode how IP addresses should be assigned from this pool.
+	CalicoIPPoolAssignmentMode CalicoIPPoolAssignmentMode
+
+	// CIDR is the CIDR block for the IP pool.
+	CIDR string
+
+	// When disabled is true, Calico IPAM will not assign addresses from this pool.
+	Disabled bool
+}
+
+// CalicoIPPoolAllowedUse controls what the IP pool will be used for.
+type CalicoIPPoolAllowedUse string
+
+const (
+	// CalicoIPPoolAllowedUseLoadBalancer indicates that the IP pool is used for loadbalancer.
+	CalicoIPPoolAllowedUseLoadBalancer CalicoIPPoolAllowedUse = "LoadBalancer"
+
+	// CalicoIPPoolAllowedUseTunnel indicates that the IP pool is used for tunnel.
+	CalicoIPPoolAllowedUseTunnel CalicoIPPoolAllowedUse = "Tunnel"
+
+	// CalicoIPPoolAllowedUseWorkload indicates that the IP pool is used for workload.
+	CalicoIPPoolAllowedUseWorkload CalicoIPPoolAllowedUse = "Workload"
+)
+
+// CalicoIPPoolAssignmentMode determines the mode how IP addresses should be assigned from this pool.
+type CalicoIPPoolAssignmentMode string
+
+const (
+	// CalicoIPPoolAssignmentModeAutomatic indicates that IPs from the Calico IP pool are assigned automatically.
+	CalicoIPPoolAssignmentModeAutomatic CalicoIPPoolAssignmentMode = "Automatic"
+
+	// CalicoIPPoolAssignmentModeManual indicates that IPs from the Calico IP pool are assigned manually.
+	CalicoIPPoolAssignmentModeManual CalicoIPPoolAssignmentMode = "Manual"
+)
 
 // CalicoBgpConfig contains BGP configuration settings for calico.
 type CalicoBgpConfig struct {

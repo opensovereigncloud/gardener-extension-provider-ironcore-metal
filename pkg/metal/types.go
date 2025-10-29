@@ -74,6 +74,8 @@ const (
 	CloudControllerManagerNodeIPAMKindKeyName = "ipamKind"
 	// CalicoBgpName is a constant for the name of the Calico BGP deployed by the worker controller.
 	CalicoBgpName = "calico-bgp"
+	// CalicoIPPoolName is a constant for the name of the Calico IP Pools deployed by the worker controller.
+	CalicoIPPoolName = "calico-ipam"
 	// MetallbName is a constant for the name of the MetalLB deployed by the worker controller.
 	MetallbName = "metallb"
 	// MetalLoadBalancerControllerSpeakerName is a constant for the name of the metal load balancer controller.
