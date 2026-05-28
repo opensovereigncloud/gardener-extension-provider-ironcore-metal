@@ -148,6 +148,7 @@ var _ = Describe("Machines", func() {
 		Expect(machineDeployments).To(Equal(worker.MachineDeployments{
 			worker.MachineDeployment{
 				Name:       deploymentName1,
+				PoolName:   pool.Name,
 				ClassName:  className1,
 				SecretName: className1,
 				Minimum:    worker.DistributeOverZones(0, pool.Minimum, 2),
@@ -169,6 +170,7 @@ var _ = Describe("Machines", func() {
 			},
 			worker.MachineDeployment{
 				Name:       deploymentName2,
+				PoolName:   pool.Name,
 				ClassName:  className2,
 				SecretName: className2,
 				Minimum:    worker.DistributeOverZones(1, pool.Minimum, 2),
@@ -189,6 +191,20 @@ var _ = Describe("Machines", func() {
 				Priority:             ptr.To(int32(1)),
 			},
 		}))
+	})
+
+	It("should set PoolName on each MachineDeployment to the worker pool name", func(ctx SpecContext) {
+		decoder := serializer.NewCodecFactory(k8sClient.Scheme(), serializer.EnableStrict).UniversalDecoder()
+		workerDelegate, err := NewWorkerDelegate(k8sClient, decoder, k8sClient.Scheme(), "", w, testCluster)
+		Expect(err).NotTo(HaveOccurred())
+
+		machineDeployments, err := workerDelegate.GenerateMachineDeployments(ctx)
+		Expect(err).NotTo(HaveOccurred())
+
+		for _, md := range machineDeployments {
+			Expect(md.PoolName).ToNot(BeEmpty(), "PoolName must not be empty for deployment %s", md.Name)
+			Expect(md.PoolName).To(Equal(pool.Name), "PoolName must match the worker pool name for deployment %s", md.Name)
+		}
 	})
 })
 
