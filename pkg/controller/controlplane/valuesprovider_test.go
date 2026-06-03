@@ -20,14 +20,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
-	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
-	apismetal "github.com/ironcore-dev/gardener-extension-provider-ironcore-metal/pkg/apis/metal"
-	"github.com/ironcore-dev/gardener-extension-provider-ironcore-metal/pkg/internal"
+	metalapi "github.com/ironcore-dev/gardener-extension-provider-ironcore-metal/pkg/apis/metal"
 	"github.com/ironcore-dev/gardener-extension-provider-ironcore-metal/pkg/metal"
 )
 
@@ -66,8 +63,8 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					DefaultSpec: extensionsv1alpha1.DefaultSpec{
 						Type: metal.Type,
 						ProviderConfig: &runtime.RawExtension{
-							Raw: encode(&apismetal.ControlPlaneConfig{
-								CloudControllerManager: &apismetal.CloudControllerManagerConfig{
+							Raw: encode(&metalapi.ControlPlaneConfig{
+								CloudControllerManager: &metalapi.CloudControllerManagerConfig{
 									FeatureGates: map[string]bool{
 										"CustomResourceValidation": true,
 									},
@@ -77,23 +74,19 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					},
 				},
 			}
-			Expect(k8sClient.Create(ctx, cp)).To(Succeed())
 
-			By("ensuring that the provider ConfigMap has been created")
-			config := &corev1.ConfigMap{
+			ctrlCluster := &controller.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: ns.Name,
-					Name:      internal.CloudProviderConfigMapName,
+					Name: cluster.Name,
 				},
 			}
-			Eventually(Get(config)).Should(Succeed())
-			Expect(config.Data).To(HaveKey("cloudprovider.conf"))
-			cloudProviderConfig := map[string]any{}
-			Expect(yaml.Unmarshal([]byte(config.Data["cloudprovider.conf"]), &cloudProviderConfig)).NotTo(HaveOccurred())
-			Expect(cloudProviderConfig["clusterName"]).To(Equal(cluster.Name))
-			networkingConfig, ok := cloudProviderConfig[metal.CloudControllerManagerNetworkingKeyName].(map[string]any)
-			Expect(ok).To(BeTrue())
-			Expect(networkingConfig[metal.CloudControllerManagerNodeAddressesConfigKeyName]).To(BeTrue())
+			values, err := vp.GetConfigChartValues(ctx, cp, ctrlCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(values["clusterName"]).To(Equal(cluster.Name))
+			// Since Networking is nil in the cpConfig above, we don't expect it in the map
+			_, ok := values[metal.CloudControllerManagerNetworkingKeyName]
+			Expect(ok).To(BeFalse())
 		})
 	})
 
@@ -113,12 +106,12 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					DefaultSpec: extensionsv1alpha1.DefaultSpec{
 						Type: metal.Type,
 						ProviderConfig: &runtime.RawExtension{
-							Raw: encode(&apismetal.ControlPlaneConfig{
-								CloudControllerManager: &apismetal.CloudControllerManagerConfig{
+							Raw: encode(&metalapi.ControlPlaneConfig{
+								CloudControllerManager: &metalapi.CloudControllerManagerConfig{
 									FeatureGates: map[string]bool{
 										"CustomResourceValidation": true,
 									},
-									Networking: &apismetal.CloudControllerNetworking{
+									Networking: &metalapi.CloudControllerNetworking{
 										ConfigureNodeAddresses: false,
 									},
 								},
@@ -127,21 +120,17 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					},
 				},
 			}
-			Expect(k8sClient.Create(ctx, cp)).To(Succeed())
 
-			By("ensuring that the provider ConfigMap has been created")
-			config := &corev1.ConfigMap{
+			ctrlCluster := &controller.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: ns.Name,
-					Name:      internal.CloudProviderConfigMapName,
+					Name: cluster.Name,
 				},
 			}
-			Eventually(Get(config)).Should(Succeed())
-			Expect(config.Data).To(HaveKey("cloudprovider.conf"))
-			cloudProviderConfig := map[string]any{}
-			Expect(yaml.Unmarshal([]byte(config.Data["cloudprovider.conf"]), &cloudProviderConfig)).NotTo(HaveOccurred())
-			Expect(cloudProviderConfig["clusterName"]).To(Equal(cluster.Name))
-			networkingConfig, ok := cloudProviderConfig[metal.CloudControllerManagerNetworkingKeyName].(map[string]any)
+			values, err := vp.GetConfigChartValues(ctx, cp, ctrlCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(values["clusterName"]).To(Equal(cluster.Name))
+			networkingConfig, ok := values[metal.CloudControllerManagerNetworkingKeyName].(map[string]any)
 			Expect(ok).To(BeTrue())
 			Expect(networkingConfig[metal.CloudControllerManagerNodeAddressesConfigKeyName]).To(BeFalse())
 		})
@@ -163,14 +152,14 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					DefaultSpec: extensionsv1alpha1.DefaultSpec{
 						Type: metal.Type,
 						ProviderConfig: &runtime.RawExtension{
-							Raw: encode(&apismetal.ControlPlaneConfig{
-								CloudControllerManager: &apismetal.CloudControllerManagerConfig{
+							Raw: encode(&metalapi.ControlPlaneConfig{
+								CloudControllerManager: &metalapi.CloudControllerManagerConfig{
 									FeatureGates: map[string]bool{
 										"CustomResourceValidation": true,
 									},
-									Networking: &apismetal.CloudControllerNetworking{
+									Networking: &metalapi.CloudControllerNetworking{
 										ConfigureNodeAddresses: true,
-										IPAMKind: &apismetal.IPAMKind{
+										IPAMKind: &metalapi.IPAMKind{
 											APIGroup: "ag",
 											Kind:     "kind",
 										},
@@ -181,23 +170,20 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					},
 				},
 			}
-			Expect(k8sClient.Create(ctx, cp)).To(Succeed())
 
-			By("ensuring that the provider ConfigMap has been created")
-			config := &corev1.ConfigMap{
+			ctrlCluster := &controller.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: ns.Name,
-					Name:      internal.CloudProviderConfigMapName,
+					Name: cluster.Name,
 				},
 			}
-			Eventually(Get(config)).Should(Succeed())
-			Expect(config.Data).To(HaveKey("cloudprovider.conf"))
-			cloudProviderConfig := map[string]any{}
-			Expect(yaml.Unmarshal([]byte(config.Data["cloudprovider.conf"]), &cloudProviderConfig)).NotTo(HaveOccurred())
-			Expect(cloudProviderConfig["clusterName"]).To(Equal(cluster.Name))
-			networkingConfig, ok := cloudProviderConfig[metal.CloudControllerManagerNetworkingKeyName].(map[string]any)
+			values, err := vp.GetConfigChartValues(ctx, cp, ctrlCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(values["clusterName"]).To(Equal(cluster.Name))
+			networkingConfig, ok := values[metal.CloudControllerManagerNetworkingKeyName].(map[string]any)
 			Expect(ok).To(BeTrue())
 			Expect(networkingConfig[metal.CloudControllerManagerNodeAddressesConfigKeyName]).To(BeTrue())
+
 			ipamKind, ok := networkingConfig[metal.CloudControllerManagerNodeIPAMKindKeyName].(map[string]any)
 			Expect(ok).To(BeTrue())
 			Expect(ipamKind).To(SatisfyAll(
@@ -231,15 +217,15 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					DefaultSpec: extensionsv1alpha1.DefaultSpec{
 						Type: metal.Type,
 						ProviderConfig: &runtime.RawExtension{
-							Raw: encode(&apismetal.ControlPlaneConfig{
-								CloudControllerManager: &apismetal.CloudControllerManagerConfig{
+							Raw: encode(&metalapi.ControlPlaneConfig{
+								CloudControllerManager: &metalapi.CloudControllerManagerConfig{
 									FeatureGates: map[string]bool{
 										"CustomResourceValidation": true,
 									},
 									PodPrefixSize: 112,
 								},
-								LoadBalancerConfig: &apismetal.LoadBalancerConfig{
-									MetalLoadBalancerConfig: &apismetal.MetalLoadBalancerConfig{
+								LoadBalancerConfig: &metalapi.LoadBalancerConfig{
+									MetalLoadBalancerConfig: &metalapi.MetalLoadBalancerConfig{
 										NodeCIDRMask:      80,
 										AllocateNodeCIDRs: true,
 										VNI:               12345,
@@ -251,7 +237,7 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					},
 				},
 			}
-			providerCloudProfile := &apismetal.CloudProfileConfig{}
+			providerCloudProfile := &metalapi.CloudProfileConfig{}
 			providerCloudProfileJson, err := json.Marshal(providerCloudProfile)
 			Expect(err).NotTo(HaveOccurred())
 			networkProviderConfig := &unstructured.Unstructured{Object: map[string]any{
@@ -366,8 +352,8 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					DefaultSpec: extensionsv1alpha1.DefaultSpec{
 						Type: metal.Type,
 						ProviderConfig: &runtime.RawExtension{
-							Raw: encode(&apismetal.ControlPlaneConfig{
-								CloudControllerManager: &apismetal.CloudControllerManagerConfig{
+							Raw: encode(&metalapi.ControlPlaneConfig{
+								CloudControllerManager: &metalapi.CloudControllerManagerConfig{
 									FeatureGates: map[string]bool{
 										"CustomResourceValidation": true,
 									},
@@ -379,7 +365,7 @@ var _ = Describe("Valueprovider Reconcile", func() {
 			}
 			Expect(k8sClient.Create(ctx, cp)).To(Succeed())
 
-			providerCloudProfile := &apismetal.CloudProfileConfig{}
+			providerCloudProfile := &metalapi.CloudProfileConfig{}
 			providerCloudProfileJson, err := json.Marshal(providerCloudProfile)
 			Expect(err).NotTo(HaveOccurred())
 			networkProviderConfig := &unstructured.Unstructured{Object: map[string]any{
@@ -458,14 +444,14 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					DefaultSpec: extensionsv1alpha1.DefaultSpec{
 						Type: metal.Type,
 						ProviderConfig: &runtime.RawExtension{
-							Raw: encode(&apismetal.ControlPlaneConfig{
-								CloudControllerManager: &apismetal.CloudControllerManagerConfig{
+							Raw: encode(&metalapi.ControlPlaneConfig{
+								CloudControllerManager: &metalapi.CloudControllerManagerConfig{
 									FeatureGates: map[string]bool{
 										"CustomResourceValidation": true,
 									},
 								},
-								LoadBalancerConfig: &apismetal.LoadBalancerConfig{
-									MetallbConfig: &apismetal.MetallbConfig{
+								LoadBalancerConfig: &metalapi.LoadBalancerConfig{
+									MetallbConfig: &metalapi.MetallbConfig{
 										IPAddressPool: []string{"10.10.10.0/24", "10.20.20.10-10.20.20.30"},
 									},
 								},
@@ -476,7 +462,7 @@ var _ = Describe("Valueprovider Reconcile", func() {
 			}
 			Expect(k8sClient.Create(ctx, cp)).To(Succeed())
 
-			providerCloudProfile := &apismetal.CloudProfileConfig{}
+			providerCloudProfile := &metalapi.CloudProfileConfig{}
 			providerCloudProfileJson, err := json.Marshal(providerCloudProfile)
 			Expect(err).NotTo(HaveOccurred())
 			networkProviderConfig := &unstructured.Unstructured{Object: map[string]any{
@@ -562,14 +548,14 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					DefaultSpec: extensionsv1alpha1.DefaultSpec{
 						Type: metal.Type,
 						ProviderConfig: &runtime.RawExtension{
-							Raw: encode(&apismetal.ControlPlaneConfig{
-								CloudControllerManager: &apismetal.CloudControllerManagerConfig{
+							Raw: encode(&metalapi.ControlPlaneConfig{
+								CloudControllerManager: &metalapi.CloudControllerManagerConfig{
 									FeatureGates: map[string]bool{
 										"CustomResourceValidation": true,
 									},
 								},
-								LoadBalancerConfig: &apismetal.LoadBalancerConfig{
-									MetalLoadBalancerConfig: &apismetal.MetalLoadBalancerConfig{
+								LoadBalancerConfig: &metalapi.LoadBalancerConfig{
+									MetalLoadBalancerConfig: &metalapi.MetalLoadBalancerConfig{
 										VNI:             80,
 										MetalBondServer: "localhost:8080",
 									},
@@ -639,21 +625,21 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					DefaultSpec: extensionsv1alpha1.DefaultSpec{
 						Type: metal.Type,
 						ProviderConfig: &runtime.RawExtension{
-							Raw: encode(&apismetal.ControlPlaneConfig{
-								CloudControllerManager: &apismetal.CloudControllerManagerConfig{
+							Raw: encode(&metalapi.ControlPlaneConfig{
+								CloudControllerManager: &metalapi.CloudControllerManagerConfig{
 									FeatureGates: map[string]bool{
 										"CustomResourceValidation": true,
 									},
 								},
-								LoadBalancerConfig: &apismetal.LoadBalancerConfig{
-									CalicoConfig: &apismetal.CalicoConfig{
-										CalicoBgpConfig: &apismetal.CalicoBgpConfig{
+								LoadBalancerConfig: &metalapi.LoadBalancerConfig{
+									CalicoConfig: &metalapi.CalicoConfig{
+										CalicoBgpConfig: &metalapi.CalicoBgpConfig{
 											ASNumber:               12345,
 											NodeToNodeMeshEnabled:  true,
 											ServiceLoadBalancerIPs: []string{"10.10.10.0/24", "10.20.20.10-10.20.20.30"},
 											ServiceClusterIPs:      []string{"10.10.10.0/24", "10.20.20.10-10.20.20.30"},
 											ServiceExternalIPs:     []string{"10.10.10.0/24", "10.20.20.10-10.20.20.30"},
-											BgpPeer: []apismetal.BgpPeer{
+											BgpPeer: []metalapi.BgpPeer{
 												{
 													PeerIP:       "1.2.3.4",
 													ASNumber:     12345,
@@ -675,7 +661,7 @@ var _ = Describe("Valueprovider Reconcile", func() {
 			}
 			Expect(k8sClient.Create(ctx, cp)).To(Succeed())
 
-			providerCloudProfile := &apismetal.CloudProfileConfig{}
+			providerCloudProfile := &metalapi.CloudProfileConfig{}
 			providerCloudProfileJson, err := json.Marshal(providerCloudProfile)
 			Expect(err).NotTo(HaveOccurred())
 			networkProviderConfig := &unstructured.Unstructured{Object: map[string]any{
@@ -772,20 +758,20 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					DefaultSpec: extensionsv1alpha1.DefaultSpec{
 						Type: metal.Type,
 						ProviderConfig: &runtime.RawExtension{
-							Raw: encode(&apismetal.ControlPlaneConfig{
-								CloudControllerManager: &apismetal.CloudControllerManagerConfig{
+							Raw: encode(&metalapi.ControlPlaneConfig{
+								CloudControllerManager: &metalapi.CloudControllerManagerConfig{
 									FeatureGates: map[string]bool{
 										"CustomResourceValidation": true,
 									},
 								},
-								LoadBalancerConfig: &apismetal.LoadBalancerConfig{
-									CalicoConfig: &apismetal.CalicoConfig{
-										CalicoBgpConfig: &apismetal.CalicoBgpConfig{
+								LoadBalancerConfig: &metalapi.LoadBalancerConfig{
+									CalicoConfig: &metalapi.CalicoConfig{
+										CalicoBgpConfig: &metalapi.CalicoBgpConfig{
 											ASNumber:               12345,
 											ServiceLoadBalancerIPs: []string{"10.10.10.0/24", "10.20.20.10-10.20.20.30"},
 											ServiceClusterIPs:      []string{"10.10.10.0/24", "10.20.20.10-10.20.20.30"},
 											ServiceExternalIPs:     []string{"10.10.10.0/24", "10.20.20.10-10.20.20.30"},
-											BgpPeer: []apismetal.BgpPeer{
+											BgpPeer: []metalapi.BgpPeer{
 												{
 													PeerIP:       "1.2.3.4",
 													ASNumber:     12345,
@@ -803,17 +789,17 @@ var _ = Describe("Valueprovider Reconcile", func() {
 													},
 												},
 											},
-											BGPFilter: []apismetal.BGPFilter{
+											BGPFilter: []metalapi.BGPFilter{
 												{
 													Name: "v4filter",
-													ImportV4: []apismetal.BGPFilterRule{
+													ImportV4: []metalapi.BGPFilterRule{
 														{
 															CIDR:          "10.10.10.0/24",
 															Action:        "Deny",
 															MatchOperator: "Equal",
 														},
 													},
-													ExportV4: []apismetal.BGPFilterRule{
+													ExportV4: []metalapi.BGPFilterRule{
 														{
 															CIDR:          "10.10.20.0/24",
 															Action:        "Deny",
@@ -823,14 +809,14 @@ var _ = Describe("Valueprovider Reconcile", func() {
 												},
 												{
 													Name: "v6filter",
-													ImportV6: []apismetal.BGPFilterRule{
+													ImportV6: []metalapi.BGPFilterRule{
 														{
 															CIDR:          "fd00:dead:beef:64:34::/80",
 															Action:        "Accept",
 															MatchOperator: "Equal",
 														},
 													},
-													ExportV6: []apismetal.BGPFilterRule{
+													ExportV6: []metalapi.BGPFilterRule{
 														{
 															CIDR:          "fd00:dead:beef:64:35::/80",
 															Action:        "Accept",
@@ -849,7 +835,7 @@ var _ = Describe("Valueprovider Reconcile", func() {
 			}
 			Expect(k8sClient.Create(ctx, cp)).To(Succeed())
 
-			providerCloudProfile := &apismetal.CloudProfileConfig{}
+			providerCloudProfile := &metalapi.CloudProfileConfig{}
 			providerCloudProfileJson, err := json.Marshal(providerCloudProfile)
 			Expect(err).NotTo(HaveOccurred())
 			networkProviderConfig := &unstructured.Unstructured{Object: map[string]any{
@@ -988,21 +974,21 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					DefaultSpec: extensionsv1alpha1.DefaultSpec{
 						Type: metal.Type,
 						ProviderConfig: &runtime.RawExtension{
-							Raw: encode(&apismetal.ControlPlaneConfig{
-								CloudControllerManager: &apismetal.CloudControllerManagerConfig{
+							Raw: encode(&metalapi.ControlPlaneConfig{
+								CloudControllerManager: &metalapi.CloudControllerManagerConfig{
 									FeatureGates: map[string]bool{
 										"CustomResourceValidation": true,
 									},
 								},
-								LoadBalancerConfig: &apismetal.LoadBalancerConfig{
-									CalicoConfig: &apismetal.CalicoConfig{
-										CalicoIPPools: []apismetal.CalicoIPPool{
+								LoadBalancerConfig: &metalapi.LoadBalancerConfig{
+									CalicoConfig: &metalapi.CalicoConfig{
+										CalicoIPPools: []metalapi.CalicoIPPool{
 											{
 												CIDR: "10.10.10.0/24",
 											},
 											{
 												CIDR:                       "10.10.20.0/24",
-												CalicoIPPoolAssignmentMode: apismetal.CalicoIPPoolAssignmentModeManual,
+												CalicoIPPoolAssignmentMode: metalapi.CalicoIPPoolAssignmentModeManual,
 											},
 										},
 									},
@@ -1014,7 +1000,7 @@ var _ = Describe("Valueprovider Reconcile", func() {
 			}
 			Expect(k8sClient.Create(ctx, cp)).To(Succeed())
 
-			providerCloudProfile := &apismetal.CloudProfileConfig{}
+			providerCloudProfile := &metalapi.CloudProfileConfig{}
 			providerCloudProfileJson, err := json.Marshal(providerCloudProfile)
 			Expect(err).NotTo(HaveOccurred())
 			networkProviderConfig := &unstructured.Unstructured{Object: map[string]any{
@@ -1066,15 +1052,15 @@ var _ = Describe("Valueprovider Reconcile", func() {
 					"enabled": true,
 					"pools": []map[string]any{
 						{
-							"allowedUses":    []apismetal.CalicoIPPoolAllowedUse{apismetal.CalicoIPPoolAllowedUseLoadBalancer},
-							"assignmentMode": apismetal.CalicoIPPoolAssignmentModeAutomatic,
+							"allowedUses":    []metalapi.CalicoIPPoolAllowedUse{metalapi.CalicoIPPoolAllowedUseLoadBalancer},
+							"assignmentMode": metalapi.CalicoIPPoolAssignmentModeAutomatic,
 							"cidr":           "10.10.10.0/24",
 							"blockSize":      24,
 							"disabled":       false,
 						},
 						{
-							"allowedUses":    []apismetal.CalicoIPPoolAllowedUse{apismetal.CalicoIPPoolAllowedUseLoadBalancer},
-							"assignmentMode": apismetal.CalicoIPPoolAssignmentModeManual,
+							"allowedUses":    []metalapi.CalicoIPPoolAllowedUse{metalapi.CalicoIPPoolAllowedUseLoadBalancer},
+							"assignmentMode": metalapi.CalicoIPPoolAssignmentModeManual,
 							"cidr":           "10.10.20.0/24",
 							"blockSize":      24,
 							"disabled":       false,
