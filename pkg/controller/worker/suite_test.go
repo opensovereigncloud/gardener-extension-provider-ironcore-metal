@@ -219,8 +219,9 @@ func SetupTest() (*corev1.Namespace, *gardener.ChartApplier) {
 				Name:    "my-os",
 				Version: "1.0",
 			},
-			Minimum: 0,
-			Name:    "pool",
+			Minimum:             0,
+			Name:                "pool",
+			NodeAgentSecretName: ptr.To("node-agent-secret"),
 			UserDataSecretRef: corev1.SecretKeySelector{
 				LocalObjectReference: corev1.LocalObjectReference{Name: userDataSecretName},
 				Key:                  userDataSecretDataKey,

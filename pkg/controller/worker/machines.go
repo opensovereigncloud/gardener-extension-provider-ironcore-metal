@@ -252,7 +252,7 @@ func (w *workerDelegate) generateHashForWorkerPool(pool v1alpha1.WorkerPool) (st
 		providerConfig = string(pool.ProviderConfig.Raw)
 	}
 	// Generate the worker pool hash.
-	return worker.WorkerPoolHash(pool, w.cluster, nil, []string{providerConfig}, []string{providerConfig})
+	return worker.WorkerPoolHash(pool, w.cluster, []string{providerConfig}, []string{providerConfig})
 }
 
 func (w *workerDelegate) getServerLabelsForMachine(machineType string, workerConfig *metalv1alpha1.WorkerConfig) (map[string]string, error) {

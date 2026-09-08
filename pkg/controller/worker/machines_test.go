@@ -59,8 +59,8 @@ var _ = Describe("Machines", func() {
 				},
 			}
 
-			// TODO: Fix machine pool hashing
-			workerPoolHash, err := worker.WorkerPoolHash(pool, testCluster, nil, nil, nil)
+			providerConfig := string(pool.ProviderConfig.Raw)
+			workerPoolHash, err := worker.WorkerPoolHash(pool, testCluster, []string{providerConfig}, []string{providerConfig})
 			Expect(err).NotTo(HaveOccurred())
 			deploymentName = fmt.Sprintf("%s-%s-z%d", technicalID, pool.Name, 1)
 			className = fmt.Sprintf("%s-%s", deploymentName, workerPoolHash)
@@ -142,7 +142,8 @@ var _ = Describe("Machines", func() {
 
 	It("should generate the machine deployments", func(ctx SpecContext) {
 		By("creating a worker delegate")
-		workerPoolHash, err := worker.WorkerPoolHash(pool, testCluster, nil, nil, nil)
+		providerConfig := string(pool.ProviderConfig.Raw)
+		workerPoolHash, err := worker.WorkerPoolHash(pool, testCluster, []string{providerConfig}, []string{providerConfig})
 		Expect(err).NotTo(HaveOccurred())
 		var (
 			deploymentName1 = fmt.Sprintf("%s-%s-z%d", technicalID, pool.Name, 1)

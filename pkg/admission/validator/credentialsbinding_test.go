@@ -6,17 +6,17 @@ package validator_test
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	extensionswebhook "github.com/gardener/gardener/extensions/pkg/webhook"
 	"github.com/gardener/gardener/pkg/apis/security"
-	mockclient "github.com/gardener/gardener/third_party/mock/controller-runtime/client"
-	mockmanager "github.com/gardener/gardener/third_party/mock/controller-runtime/manager"
+	testutils "github.com/gardener/gardener/pkg/utils/test"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/ironcore-dev/gardener-extension-provider-ironcore-metal/pkg/admission/validator"
 )
@@ -29,28 +29,17 @@ var _ = Describe("CredentialsBinding validator", func() {
 		)
 
 		var (
-			credentialsBindingValidator extensionswebhook.Validator
-
-			ctrl      *gomock.Controller
-			mgr       *mockmanager.MockManager
-			apiReader *mockclient.MockReader
-
 			ctx                = context.TODO()
 			credentialsBinding *security.CredentialsBinding
 
-			fakeErr = fmt.Errorf("fake err")
+			scheme = func() *runtime.Scheme {
+				s := runtime.NewScheme()
+				Expect(corev1.AddToScheme(s)).To(Succeed())
+				return s
+			}()
 		)
 
 		BeforeEach(func() {
-			ctrl = gomock.NewController(GinkgoT())
-
-			mgr = mockmanager.NewMockManager(ctrl)
-
-			apiReader = mockclient.NewMockReader(ctrl)
-			mgr.EXPECT().GetAPIReader().Return(apiReader)
-
-			credentialsBindingValidator = validator.NewCredentialsBindingValidator(mgr)
-
 			credentialsBinding = &security.CredentialsBinding{
 				CredentialsRef: corev1.ObjectReference{
 					Name:       name,
@@ -61,74 +50,77 @@ var _ = Describe("CredentialsBinding validator", func() {
 			}
 		})
 
-		AfterEach(func() {
-			ctrl.Finish()
-		})
+		newValidator := func(objects ...client.Object) extensionswebhook.Validator {
+			b := fakeclient.NewClientBuilder().WithScheme(scheme)
+			if len(objects) > 0 {
+				b = b.WithObjects(objects...)
+			}
+			mgr := &testutils.FakeManager{APIReader: b.Build()}
+			return validator.NewCredentialsBindingValidator(mgr)
+		}
 
 		It("should return err when obj is not a CredentialsBinding", func() {
-			err := credentialsBindingValidator.Validate(ctx, &corev1.Secret{}, nil)
+			v := newValidator()
+			err := v.Validate(ctx, &corev1.Secret{}, nil)
 			Expect(err).To(MatchError("wrong object type *v1.Secret"))
 		})
 
 		It("should return err when oldObj is not a CredentialsBinding", func() {
-			err := credentialsBindingValidator.Validate(ctx, &security.CredentialsBinding{}, &corev1.Secret{})
+			v := newValidator()
+			err := v.Validate(ctx, &security.CredentialsBinding{}, &corev1.Secret{})
 			Expect(err).To(MatchError("wrong object type *v1.Secret for old object"))
 		})
 
 		It("should return err if the CredentialsBinding references unknown credentials type", func() {
+			v := newValidator()
 			credentialsBinding.CredentialsRef.APIVersion = "unknown"
-			err := credentialsBindingValidator.Validate(ctx, credentialsBinding, nil)
+			err := v.Validate(ctx, credentialsBinding, nil)
 			Expect(err).To(MatchError(errors.New(`unsupported credentials reference: version "unknown", kind "Secret"`)))
 		})
 
 		It("should return err if it fails to get the corresponding Secret", func() {
-			apiReader.EXPECT().Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, gomock.AssignableToTypeOf(&corev1.Secret{})).Return(fakeErr)
-
-			err := credentialsBindingValidator.Validate(ctx, credentialsBinding, nil)
-			Expect(err).To(MatchError(fakeErr))
+			// no secret pre-loaded → Get returns NotFound
+			v := newValidator()
+			err := v.Validate(ctx, credentialsBinding, nil)
+			Expect(err).To(HaveOccurred())
 		})
 
 		It("should return err when the corresponding Secret is not valid", func() {
-			apiReader.EXPECT().Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, gomock.AssignableToTypeOf(&corev1.Secret{})).
-				DoAndReturn(func(_ context.Context, _ client.ObjectKey, obj *corev1.Secret, _ ...client.GetOption) error {
-					secret := &corev1.Secret{Data: map[string][]byte{
-						"foo": []byte("bar"),
-					}}
-					*obj = *secret
-					return nil
-				})
-
-			err := credentialsBindingValidator.Validate(ctx, credentialsBinding, nil)
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+				Data: map[string][]byte{
+					"foo": []byte("bar"),
+				},
+			}
+			v := newValidator(secret)
+			err := v.Validate(ctx, credentialsBinding, nil)
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("should succeed when the corresponding Secret is valid", func() {
-			apiReader.EXPECT().Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, gomock.AssignableToTypeOf(&corev1.Secret{})).
-				DoAndReturn(func(_ context.Context, _ client.ObjectKey, obj *corev1.Secret, _ ...client.GetOption) error {
-					secret := &corev1.Secret{Data: map[string][]byte{
-						"namespace": []byte("default"),
-						"token":     []byte("abcd"),
-						"username":  []byte("admin"),
-					}}
-
-					*obj = *secret
-					return nil
-				})
-
-			Expect(credentialsBindingValidator.Validate(ctx, credentialsBinding, nil)).To(Succeed())
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+				Data: map[string][]byte{
+					"namespace": []byte("default"),
+					"token":     []byte("abcd"),
+					"username":  []byte("admin"),
+				},
+			}
+			v := newValidator(secret)
+			Expect(v.Validate(ctx, credentialsBinding, nil)).To(Succeed())
 		})
 
 		It("should succeed when the CredentialsBinding references a WorkloadIdentity", func() {
 			credentialsBinding.CredentialsRef.APIVersion = "security.gardener.cloud/v1alpha1"
 			credentialsBinding.CredentialsRef.Kind = "WorkloadIdentity"
-			// No apiReader.EXPECT() — Get must NOT be called for WorkloadIdentity refs
-			Expect(credentialsBindingValidator.Validate(ctx, credentialsBinding, nil)).To(Succeed())
+			v := newValidator()
+			Expect(v.Validate(ctx, credentialsBinding, nil)).To(Succeed())
 		})
 
 		It("should return nil when the CredentialsBinding did not change", func() {
+			v := newValidator()
 			old := credentialsBinding.DeepCopy()
-
-			Expect(credentialsBindingValidator.Validate(ctx, credentialsBinding, old)).To(Succeed())
+			Expect(v.Validate(ctx, credentialsBinding, old)).To(Succeed())
 		})
 	})
 })

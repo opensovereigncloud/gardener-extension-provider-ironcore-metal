@@ -12,15 +12,14 @@ import (
 	gcontext "github.com/gardener/gardener/extensions/pkg/webhook/context"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	securityv1alpha1constants "github.com/gardener/gardener/pkg/apis/security/v1alpha1/constants"
-	mockclient "github.com/gardener/gardener/third_party/mock/controller-runtime/client"
-	mockmanager "github.com/gardener/gardener/third_party/mock/controller-runtime/manager"
+	testutils "github.com/gardener/gardener/pkg/utils/test"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/clientcmd"
+	fakeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	api "github.com/ironcore-dev/gardener-extension-provider-ironcore-metal/pkg/apis/metal"
 	"github.com/ironcore-dev/gardener-extension-provider-ironcore-metal/pkg/apis/metal/install"
@@ -47,10 +46,7 @@ func TestController(t *testing.T) {
 
 var _ = Describe("Ensurer", func() {
 	var (
-		ctrl   *gomock.Controller
 		ctx    = context.TODO()
-		mgr    *mockmanager.MockManager
-		c      *mockclient.MockClient
 		scheme *runtime.Scheme
 
 		eContextK8s = gcontext.NewInternalGardenContext(
@@ -75,17 +71,7 @@ var _ = Describe("Ensurer", func() {
 	)
 
 	BeforeEach(func() {
-		ctrl = gomock.NewController(GinkgoT())
-		c = mockclient.NewMockClient(ctrl)
 		scheme = &runtime.Scheme{}
-
-		mgr = mockmanager.NewMockManager(ctrl)
-		mgr.EXPECT().GetClient().Return(c)
-		mgr.EXPECT().GetScheme().Return(scheme)
-	})
-
-	AfterEach(func() {
-		ctrl.Finish()
 	})
 
 	Describe("#EnsureCloudProviderSecret", func() {
@@ -143,6 +129,8 @@ var _ = Describe("Ensurer", func() {
 				},
 			}
 
+			c := fakeclient.NewClientBuilder().Build()
+			mgr := &testutils.FakeManager{Client: c, Scheme: scheme}
 			ensurer = NewEnsurer(logger, mgr, "")
 		})
 
@@ -177,26 +165,13 @@ var _ = Describe("Ensurer", func() {
 
 var _ = Describe("Ensurer (workload identity)", func() {
 	var (
-		ctrl     *gomock.Controller
 		ctx      = context.TODO()
 		wiScheme *runtime.Scheme
-		wiMgr    *mockmanager.MockManager
-		wiC      *mockclient.MockClient
 	)
 
 	BeforeEach(func() {
-		ctrl = gomock.NewController(GinkgoT())
 		wiScheme = runtime.NewScheme()
 		Expect(install.AddToScheme(wiScheme)).To(Succeed())
-
-		wiC = mockclient.NewMockClient(ctrl)
-		wiMgr = mockmanager.NewMockManager(ctrl)
-		wiMgr.EXPECT().GetClient().Return(wiC)
-		wiMgr.EXPECT().GetScheme().Return(wiScheme)
-	})
-
-	AfterEach(func() {
-		ctrl.Finish()
 	})
 
 	Describe("#EnsureCloudProviderSecret", func() {
@@ -231,6 +206,8 @@ var _ = Describe("Ensurer (workload identity)", func() {
 		)
 
 		It("should write a tokenFile kubeconfig when workload identity is active", func() {
+			wiC := fakeclient.NewClientBuilder().Build()
+			wiMgr := &testutils.FakeManager{Client: wiC, Scheme: wiScheme}
 			ensurer := NewEnsurer(logger, wiMgr, "my-namespace")
 			secret := wiSecret()
 			Expect(ensurer.EnsureCloudProviderSecret(ctx, wiCluster, secret, nil)).To(Succeed())
@@ -246,6 +223,8 @@ var _ = Describe("Ensurer (workload identity)", func() {
 		})
 
 		It("should fail when --metal-namespace flag is not set", func() {
+			wiC := fakeclient.NewClientBuilder().Build()
+			wiMgr := &testutils.FakeManager{Client: wiC, Scheme: wiScheme}
 			ensurer := NewEnsurer(logger, wiMgr, "")
 			secret := wiSecret()
 			Expect(ensurer.EnsureCloudProviderSecret(ctx, wiCluster, secret, nil)).To(MatchError(ContainSubstring("metal namespace is not configured")))

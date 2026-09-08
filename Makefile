@@ -1,4 +1,5 @@
 ENSURE_GARDENER_MOD         := $(shell go get github.com/gardener/gardener@$$(go list -m -f "{{.Version}}" github.com/gardener/gardener))
+ENSURE_GARDENER_TOOLS_MOD   := $(shell go get github.com/gardener/gardener/hack/tools@$$(go list -m -f "{{.Version}}" github.com/gardener/gardener/hack/tools))
 GARDENER_HACK_DIR    		:= $(shell go list -m -f "{{.Dir}}" github.com/gardener/gardener)/hack
 EXTENSION_PREFIX            := gardener-extension
 NAME                        := provider-ironcore-metal
@@ -110,11 +111,9 @@ check: $(GOIMPORTS) $(GOLANGCI_LINT) $(MOCKGEN)
 	@REPO_ROOT=$(REPO_ROOT) bash $(GARDENER_HACK_DIR)/check-charts.sh ./charts
 
 .PHONY: generate
-generate: docs $(CONTROLLER_GEN) $(EXTENSION_GEN) $(HELM) $(KUSTOMIZE) $(MOCKGEN) $(YQ) $(VGOPATH)
-	@GOPATH=$(GOPATH) VGOPATH=$(VGOPATH) \
-	MOCKGEN=$(MOCKGEN) \
-	REPO_ROOT=$(REPO_ROOT) \
-	GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) \
+generate: $(CONTROLLER_GEN) $(CRD_REF_DOCS) $(EXTENSION_GEN) $(HELM) $(KUSTOMIZE) $(MOCKGEN) $(YQ)
+	@go mod download
+	@REPO_ROOT=$(REPO_ROOT) GARDENER_HACK_DIR=$(GARDENER_HACK_DIR) \
 	bash $(GARDENER_HACK_DIR)/generate-sequential.sh ./charts/... ./cmd/... ./example/... ./pkg/...
 	$(MAKE) format
 	@GO111MODULE=on go mod tidy
@@ -140,11 +139,6 @@ verify: check format test
 
 .PHONY: verify-extended
 verify-extended: check-generate check format test-cov test-clean
-
-.PHONY: docs
-docs: $(GEN_CRD_API_REFERENCE_DOCS) ## Run go generate to generate API reference documentation.
-	$(GEN_CRD_API_REFERENCE_DOCS) -api-dir ./pkg/apis/metal/v1alpha1 -config ./hack/api-reference/api.json -template-dir ./hack/api-reference/template -out-file ./hack/api-reference/api.md
-	$(GEN_CRD_API_REFERENCE_DOCS) -api-dir ./pkg/apis/config/v1alpha1 -config ./hack/api-reference/config.json -template-dir ./hack/api-reference/template -out-file ./hack/api-reference/config.md
 
 ##@ Tools
 

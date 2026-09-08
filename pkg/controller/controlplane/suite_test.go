@@ -147,7 +147,7 @@ func SetupTest() (*corev1.Namespace, *valuesProvider, *extensionsv1alpha1.Cluste
 			},
 			Spec: extensionsv1alpha1.ClusterSpec{
 				CloudProfile: apiruntime.RawExtension{Raw: []byte("{}")},
-				Seed:         apiruntime.RawExtension{Raw: []byte("{}")},
+				Seed:         &apiruntime.RawExtension{Raw: []byte("{}")},
 				Shoot:        apiruntime.RawExtension{Raw: shootJson},
 			},
 		}

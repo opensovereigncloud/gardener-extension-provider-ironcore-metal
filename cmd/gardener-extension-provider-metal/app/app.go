@@ -192,8 +192,10 @@ func NewControllerManagerCommand(ctx context.Context) *cobra.Command {
 			heartbeatCtrlOpts.Completed().Apply(&heartbeat.DefaultAddOptions)
 			infraCtrlOpts.Completed().Apply(&infrastructurecontroller.DefaultAddOptions.Controller)
 			workerCtrlOpts.Completed().Apply(&workercontroller.DefaultAddOptions.Controller)
-			reconcileOpts.Completed().Apply(&infrastructurecontroller.DefaultAddOptions.IgnoreOperationAnnotation, &infrastructurecontroller.DefaultAddOptions.ExtensionClasses)
-			reconcileOpts.Completed().Apply(&workercontroller.DefaultAddOptions.IgnoreOperationAnnotation, &workercontroller.DefaultAddOptions.ExtensionClasses)
+			reconcileOpts.Completed().Apply(&infrastructurecontroller.DefaultAddOptions.IgnoreOperationAnnotation)
+			reconcileOpts.Completed().Apply(&workercontroller.DefaultAddOptions.IgnoreOperationAnnotation)
+			infrastructurecontroller.DefaultAddOptions.ExtensionClasses = generalOpts.Completed().ExtensionClasses
+			workercontroller.DefaultAddOptions.ExtensionClasses = generalOpts.Completed().ExtensionClasses
 			workercontroller.DefaultAddOptions.GardenCluster = gardenCluster
 			workercontroller.DefaultAddOptions.SelfHostedShootCluster = generalOpts.Completed().SelfHostedShootCluster
 
